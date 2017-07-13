@@ -1,5 +1,7 @@
 # Robo JS Minify
 
+**This package is under development. Use it at your own risk.**
+
 [![Software License](https://img.shields.io/badge/license-MIT-brightgreen.svg?branch=master)](LICENSE.txt)
 [![Build Status](https://travis-ci.org/elephfront/robo-js-minify.svg?branch=master)](https://travis-ci.org/elephfront/robo-js-minify)
 [![Codecov](https://img.shields.io/codecov/c/github/elephfront/robo-js-minify.svg)](https://github.com/elephfront/robo-js-minify)
