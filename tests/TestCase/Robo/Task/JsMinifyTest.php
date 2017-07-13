@@ -157,8 +157,8 @@ class JsMinifyTest extends TestCase
 //    }
 //
 //    /**
-//     * Test a basic minification with GZIP compression enabled but an out of bound limit (will lead to the default value
-//     * 9 to be used)
+//     * Test a basic minification with GZIP compression enabled but an out of bound limit (will lead to the default
+//     * value 9 to be used)
 //     *
 //     * @return void
 //     */
