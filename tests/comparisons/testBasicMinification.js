@@ -1,0 +1,1 @@
+var msg='Hello';alert(msg);var thisIsABool=!0

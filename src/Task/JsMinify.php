@@ -58,6 +58,27 @@ class JsMinify extends BaseTask implements TaskInterface, Consumer
     protected $returnData = [];
 
     /**
+     * Whether or not the destination file should be written after the replace have been done.
+     *
+     * @var bool
+     */
+    protected $writeFile = true;
+
+    /**
+     * Whether or not the destination file should be minify AND 'gzipper'
+     *
+     * @var bool
+     */
+    protected $withGzip = false;
+
+    /**
+     * Gzip level to apply when using the Gzip mode
+     *
+     * @var int
+     */
+    protected $gzipLevel = 9;
+
+    /**
      * Constructor. Will bind the destinations map.
      *
      * @param array $destinationsMap Key / value pairs array where the key is the source and the value the destination.
@@ -65,6 +86,18 @@ class JsMinify extends BaseTask implements TaskInterface, Consumer
     public function __construct(array $destinationsMap = [])
     {
         $this->setDestinationsMap($destinationsMap);
+    }
+
+    /**
+     * Disables the `writeFile` property
+     *
+     * @return self
+     */
+    public function disableWriteFile()
+    {
+        $this->writeFile = false;
+
+        return $this;
     }
 
     /**
@@ -76,6 +109,36 @@ class JsMinify extends BaseTask implements TaskInterface, Consumer
     public function setDestinationsMap(array $destinationsMap = [])
     {
         $this->destinationsMap = $destinationsMap;
+
+        return $this;
+    }
+
+    /**
+     * Enables the `withGzip` property
+     *
+     * @return self
+     */
+    public function enableGzip()
+    {
+        $this->withGzip = true;
+
+        return $this;
+    }
+
+    /**
+     * Set the level of compression to use when using the `gzip` option.
+     * Value should be between -1 and 9. If you use a value that is out of these bounds, will default to 9.
+     *
+     * @param int $level Level of gzip compression
+     * @return self
+     */
+    public function setGzipLevel(int $level)
+    {
+        if ($level < -1 || $level > 9) {
+            $level = 9;
+        }
+
+        $this->gzipLevel = $level;
 
         return $this;
     }
@@ -97,8 +160,15 @@ class JsMinify extends BaseTask implements TaskInterface, Consumer
                     'Impossible to run the JsMinify task without a destinations map.'
                 );
             }
-            
-            $exec = $this->processDestinationsMap($this->destinationsMap);
+
+            try {
+                $exec = $this->processDestinationsMap($this->destinationsMap);
+            } catch (InvalidArgumentException $e) {
+                return Result::error(
+                    $this,
+                    $e->getMessage()
+                );
+            }
         }
 
         if ($exec !== true) {
@@ -124,6 +194,10 @@ class JsMinify extends BaseTask implements TaskInterface, Consumer
         $exec = true;
 
         foreach ($destinationsMap as $source => $destination) {
+            if (!file_exists($source)) {
+                throw new InvalidArgumentException(sprintf('Impossible to find source file `%s`', $source));
+            }
+
             $this->minifier = new JS();
             $this->minifier->add($source);
             $exec = $this->execMinify($source, $destination);
@@ -169,6 +243,24 @@ class JsMinify extends BaseTask implements TaskInterface, Consumer
     }
 
     /**
+     * Write the `$destination` file with the css content passed in `$js`
+     *
+     * @param string $destination Path of the destination file to write in
+     * @param string $js JS content to write into the file
+     * @return int Number of bytes written or false on failure.
+     */
+    public function writeFile(string $destination, string $js)
+    {
+        $destinationDirectory = dirname($destination);
+
+        if (!is_dir($destinationDirectory)) {
+            mkdir($destinationDirectory, 0755, true);
+        }
+
+        return file_put_contents($destination, $js);
+    }
+
+    /**
      * Execute the JS minification
      *
      * @param string $source Path of the source file.
@@ -177,28 +269,30 @@ class JsMinify extends BaseTask implements TaskInterface, Consumer
      */
     protected function execMinify(string $source, string $destination)
     {
-        $destinationDirectory = dirname($destination);
-
-        if (!is_dir($destinationDirectory)) {
-            mkdir($destinationDirectory, 0755, true);
+        if ($this->withGzip) {
+            $js = $this->minifier->gzip(null, $this->gzipLevel);
+        } else {
+            $js = $this->minifier->minify();
         }
 
-        try {
-            $js = $this->minifier->minify($destination);
+        $successMessage = sprintf('Minified JS from <info>%s</info>', $source);
 
-            $this->printTaskSuccess(
-                sprintf(
-                    'Minified JS from <info>%s</info> to <info>%s</info>',
-                    $source,
-                    $destination
-                )
+        if ($this->writeFile) {
+            if (!$this->writeFile($destination, $js)) {
+                $error = $source;
+                return $error;
+            }
+
+            $successMessage = sprintf(
+                'Minified JS from <info>%s</info> to <info>%s</info>',
+                $source,
+                $destination
             );
-
-            $this->returnData[$source] = ['js' => $js, 'destination' => $destination];
-        } catch (\Exception $e) {
-            $error = $e->getMessage();
-            return $error;
         }
+
+        $this->printTaskSuccess($successMessage);
+
+        $this->returnData[$source] = ['js' => $js, 'destination' => $destination];
 
         return true;
     }
